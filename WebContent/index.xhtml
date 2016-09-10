@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml"  
+    xmlns:h="http://java.sun.com/jsf/html"  
+    xmlns:f="http://java.sun.com/jsf/core"  
+    xmlns:p="http://primefaces.org/ui"
+    xmlns:fn="http://java.sun.com/jsp/jstl/functions"
+    xmlns:c="http://java.sun.com/jsp/jstl/core">
+  <h:head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+    <meta name="description" content="" />
+    <meta name="author" content="" />
+
+    <title>Tweet Annotator</title>
+	
+    <!-- Bootstrap core CSS -->
+    <h:outputStylesheet name="bootstrap-3.3.4-dist/css/bootstrap.min.css" />
+
+    <!-- Custom styles for this template -->
+    <h:outputStylesheet name="css/jumbotron.css" />
+
+    <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+      <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+    <![endif]-->
+    
+    <style type="text/css">
+    	.ui-growl {
+			position:fixed;
+			top: 10%;
+			left: 65%;
+			width: 360px;
+			height: 110px;
+			z-index:9999;
+		}
+		
+		label > input{ /* HIDE RADIO */
+		  visibility: hidden; /* Makes input not-clickable */
+		  position: absolute; /* Remove input from document flow */
+		}
+		label > input + img{ /* IMAGE STYLES */
+		  cursor:pointer;
+		  border:2px solid transparent;
+		}
+		label > input:checked + img{ /* (RADIO CHECKED) IMAGE STYLES */
+		  /* border:2px solid #f00; */
+		}
+    </style>
+    
+    <script language="JavaScript">
+    	
+    	// Global vars for annotations
+    	var SEMANTIC_TERMS_COUNT = 0;
+    	var SELECTED_SEMANTIC_CONTEXT = null;
+    	var SELECTED_SEMANTIC_TERM_POS = Array();
+    	var SELECTED_SEMANTIC_TERMS = Array();
+    	
+    	var SPATIAL_TERMS_COUNT = 0;
+    	var SELECTED_SPATIAL_CONTEXT = null;
+    	var SELECTED_SPATIAL_TERM_POS = Array();
+    	var SELECTED_SPATIAL_TERMS = Array();
+    	
+    	var SENTIMENT_TERMS_COUNT = 0;
+    	var SELECTED_SENTIMENT_CONTEXT = null;
+    	var SELECTED_SENTIMENT_OPINION_CONTEXT = null;
+    	var SELECTED_SENTIMENT_TERM_POS = Array();
+    	var SELECTED_SENTIMENT_TERMS = Array();
+    	
+    	var ANNOTATION_SEQUENCE_POS = Array();
+    	
+    </script>
+    
+  </h:head>
+
+  <h:body>
+
+	<p:growl id="growl" sticky="true"  />
+			
+	<p:layout fullPage="true">
+	
+	
+    <h:form id="form_login">
+	
+    <nav class="navbar navbar-inverse navbar-fixed-top">
+      
+      <div class="container">
+        
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand" href="#">Tweet Annotator</a>
+        </div>
+        
+        <p:outputPanel styleClass="navbar-collapse collapse" rendered="#{loginBean.currentUser!=null}">
+          
+          <div id="navbar" class="collapse navbar-collapse">
+	          <ul class="nav navbar-nav">
+	            <li id="menu_home">
+	            	<p:commandLink update=":form_login" actionListener="#{loginBean.goToHomePage}" >
+				        Home
+				    </p:commandLink>
+	            </li>
+	            <li id="menu_annotate">
+	            	<p:commandLink update=":form_login" actionListener="#{loginBean.goToAnnotationPage}" >
+				        <font color="yellow">Annotate!</font>
+				    </p:commandLink>
+	            </li>
+	            <li id="menu_manage">
+	            	<p:commandLink update=":form_login" actionListener="#{loginBean.goToManagePage}" rendered="#{loginBean.currentUser.name=='Maxwell'}" >
+				        <font color="yellow">Manage</font>
+				    </p:commandLink>
+	            </li>
+	            <!-- <li><a href="#reference">Reference!</a></li>  -->
+	            <li id="menu_about">
+	            	<p:commandLink update=":form_login" actionListener="#{loginBean.goToAboutPage}" >
+				        Help
+				    </p:commandLink>
+	            </li>
+	            <li id="menu_contact">
+	            	<p:commandLink update=":form_login" actionListener="#{loginBean.goToContactPage}" >
+				        Contact
+				    </p:commandLink>
+	            </li>
+	          </ul>
+	          
+	          <div id="navbar_logout" class="navbar-form navbar-right">
+	                &#160;<a href="#"><h:outputLabel value="#{loginBean.currentUser.name}" /></a>&#160;&#160;&#160;&#160;
+		          	<span class="badge">&#160;<h:outputLabel value="#{loginBean.currentUser.jobsCompleted}" /> jobs completed&#160;</span> &#160;&#160;
+					<p:commandButton id="logout_submit" type="submit" styleClass="btn btn-success" value="Sign out" actionListener="#{loginBean.doLogout}" update=":growl, :form_login" />
+	      	  </div>
+          </div>
+           
+        </p:outputPanel>
+        
+        <p:outputPanel styleClass="navbar-collapse collapse" rendered="#{loginBean.currentUser==null}">
+	        <div id="navbar_login" class="navbar-form navbar-right">
+		    	<div class="form-group">
+		        	<p:inputText id="lgn_user" placeholder="Email" styleClass="form-control" value="#{loginBean.inputUser}" required="true" requiredMessage="E-mail is required!" />
+		        </div>
+		        <div class="form-group">
+		        	<p:password id="lgn_pass" placeholder="Password" styleClass="form-control" value="#{loginBean.inputPass}" required="true" requiredMessage="Password is required!" />
+		        </div>
+		        &#160;
+		        <p:commandButton id="login_submit" type="submit" styleClass="btn btn-success" value="Sign in" actionListener="#{loginBean.doLogin}" update=":growl, :form_login" />
+	        </div>
+        </p:outputPanel>
+        
+       </div><!--/.navbar-collapse -->
+       
+    </nav>
+
+	<p:outputPanel rendered="#{loginBean.currentUser!=null and loginBean.currentPage=='Home'}">
+		<div class="container">
+	
+	      <div class="starter-template">
+	        <h1>Welcome, <h:outputLabel value="#{loginBean.currentUser.name}" />!</h1>
+	        <p class="lead">For starting the annotation process, just click in "Annotate!". Have a good and pleasurable job! :)</p>
+	      </div>
+	
+		  <div class="panel panel-warning">
+				<div class="panel-heading">
+					<h3 class="panel-title">Your progress</h3>
+				</div>
+				<div class="panel-body">	
+					<div class="progress">
+						<div class="progress-bar #{loginBean.progressClass}" role="progressbar" aria-valuenow="#{loginBean.progress}" aria-valuemin="0" aria-valuemax="100" style="width: #{loginBean.progressBar}%">
+							<h:outputLabel value="#{loginBean.progressText}" /> % Complete
+						</div>
+					</div>
+				</div>
+		  </div>
+		  
+		  <!-- 
+		  <div class="panel panel-info">
+				<div class="panel-heading">
+					<h3 class="panel-title">Access History</h3>
+				</div>
+				<div class="panel-body">	
+					...
+				</div>
+		  </div>
+		   -->
+			
+		</div>
+	</p:outputPanel>
+	
+	<p:outputPanel rendered="#{loginBean.currentUser!=null and loginBean.currentPage=='Annotate'}">
+		<div class="container">
+	
+		<p:outputPanel rendered="#{loginBean.currentTweet==null}">
+			<div class="starter-template">
+				<br />
+				<br />
+		        <p class="lead">Ops... unfortunatelly there are no tweets to annotate for now. Please try again later or contact the system administrator.</p>
+		    </div>
+		</p:outputPanel>
+		
+		<p:outputPanel rendered="#{loginBean.currentTweet!=null}">
+			<div class="starter-template">
+				
+		    </div>
+	      
+	      	<div class="row">
+	        	<div class="col-sm-9">
+	        		<br />
+					<br />
+		        	<p class="lead">Please, read carefully the tweet below and select thematic, spatial and sentiment terms, if applicable. Start clicking over a desired word from the short text below.</p>
+		        
+	        		<div id="ann_alert" class="alert alert-warning" role="alert" style="display: none;">
+	        			<b>Please wait!</b> Saving and loading the next tweet...
+	        		</div>
+	        	
+					<!-- <div class="well"> -->
+					<div class="panel panel-info">
+						<div class="panel-heading">
+							<h3 class="panel-title"><b>Tweet</b></h3>
+						</div>
+						<div class="panel-body">
+					
+						<c:forEach items="#{loginBean.currentTweet.stemmedMessage}" var="term" varStatus="n">
+														
+							<span id="term#{n.index+1}tex" style="display: inline;" onclick="showAnnotateList('term#{n.index+1}');">#{term}</span>
+					        		
+					       	<span id="term#{n.index+1}div" style="display: none;">
+						        <div class="btn-group">
+									<button id="term#{n.index+1}" type="button" class="btn btn-default btn-xs dropdown-toggle" data-toggle="dropdown" aria-expanded="false">
+										#{term} <span class="caret"></span>
+									</button>
+									<ul class="dropdown-menu" role="menu">
+										<li><a href="#" class="btn btn-sm btn-success" onclick="annotateTerm('term#{n.index+1}',1);">Thematic Term</a></li>
+										<li><a href="#" class="btn btn-sm btn-danger" onclick="annotateTerm('term#{n.index+1}',2);">Spatial Term</a></li>
+										<li class="divider"></li>
+										<li><a href="#" class="btn btn-sm btn-warning" onclick="annotateTerm('term#{n.index+1}',3);">Express Sentiment</a></li>
+										<li class="divider"></li>
+										<li><a href="#" class="btn btn-sm btn-default" onclick="annotateTerm('term#{n.index+1}',0);">None</a></li>
+									</ul>
+									&#160;
+								</div>
+							</span>
+								
+						</c:forEach>
+					
+						</div>
+			      	</div>
+					
+					<div class="row">
+			        	<div class="col-sm-6">
+			        		<div class="panel panel-success">
+								<div class="panel-heading">
+									<h3 class="panel-title">Thematic Context</h3>
+								</div>
+								<div class="panel-body" id="semantic0">You must select thematic terms before selecting a context.</div>
+								<div class="panel-body" id="semantic8" style="display:none;">
+									Please, select an appropriate context for the selected thematic terms:
+									<div class="btn-group dropdown">
+										  <button id="semanticContextList" class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown" aria-expanded="true">
+										    -- Select --
+										    <span class="caret"></span>
+										  </button>
+										  <ul class="dropdown-menu" role="menu" aria-labelledby="dropdownMenu1">
+										  	<c:forEach items="#{loginBean.semContList}" var="context" >
+										  		<li role="presentation" onclick="selectSemanticContext(this.value,'#{context.name}');" value="#{context.id}"><a role="menuitem" tabindex="-1" href="#">#{context.name}</a></li>
+										  	</c:forEach>
+										  </ul>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="col-sm-6">
+							<div class="panel panel-danger">
+								<div class="panel-heading">
+									<h3 class="panel-title">Spatial Context</h3>
+								</div>
+								<div class="panel-body" id="spatial0">You must select spatial terms before selecting a context.</div>
+								<div class="panel-body" id="spatial8" style="display:none;">
+									Please, select an appropriate context for the selected spatial terms:
+									<div class="dropdown">
+										  <button id="spatialContextList" class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown" aria-expanded="true">
+										    -- Select --
+										    <span class="caret"></span>
+										  </button>
+										  <ul class="dropdown-menu" role="menu" aria-labelledby="dropdownMenu1">
+										  	<c:forEach items="#{loginBean.spatContList}" var="context" >
+										  		<li role="presentation" onclick="selectSpatialContext(this.value,'#{context.name}');" value="#{context.id}"><a role="menuitem" tabindex="-1" href="#">#{context.name}</a></li>
+										  	</c:forEach>
+										  </ul>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="col-sm-12">
+			        		<div class="panel panel-warning">
+								<div class="panel-heading">
+									<h3 class="panel-title">Sentiment</h3>
+								</div>
+								<div class="panel-body" id="sentiment0" style="display:none;">You must select sentiment terms before selecting a sentiment.</div>
+								<div class="panel-body" id="sentiment8">
+									Please, select an appropriate sentiment for the selected sentiment terms:
+									<label>
+									  <input type="radio" name="sentiment" value="1" onclick="selectSentiment(this);"  />
+									  <img id="positive-button-selected" style="display:none;" width="42" height="42" src="#{resource['imgs/smile-pos-select.jpg']}" title="Positive" />
+									  <img id="positive-button-unselected" width="42" height="42" src="#{resource['imgs/smile-pos-unselect.jpg']}" title="Positive" />
+									</label>
+									<label>
+									  <input type="radio" name="sentiment" value="2" onclick="selectSentiment(this);" />
+									  <img id="neutral-button-selected" style="display:none;" width="42" height="42" src="#{resource['imgs/smile-neu-select.jpg']}" title="Neutral" />
+									  <img id="neutral-button-unselected" width="42" height="42" src="#{resource['imgs/smile-neu-unselect.jpg']}" title="Neutral" />
+									</label>
+									<label>
+									  <input type="radio" name="sentiment" value="3" onclick="selectSentiment(this);" />
+									  <img id="negative-button-selected" style="display:none;" width="42" height="42" src="#{resource['imgs/smile-neg-select.jpg']}" title="Negative" />
+									  <img id="negative-button-unselected" width="42" height="42" src="#{resource['imgs/smile-neg-unselect.jpg']}" title="Negative" />
+									</label>
+									
+									<br/>
+									Please, also choose the appropriate nature of the message:
+									
+									<input type="radio" name="is_opinative" value="0" onclick="selectSentimentOpinionContext(this.value);" />
+									<b>Informative</b>
+									
+									<input type="radio" name="is_opinative" value="1" onclick="selectSentimentOpinionContext(this.value);" />
+									<b>Opinionated</b>
+									
+								</div>
+							</div>
+						</div>
+					</div>
+					
+					<h:inputHidden id="tmpSemCont" value="#{loginBean.tempSemanticContext}" />
+					<h:inputHidden id="tmpSpaCont" value="#{loginBean.tempSpatialContext}" />
+					<h:inputHidden id="tmpSentCont" value="#{loginBean.tempSentimentContext}" />
+					<h:inputHidden id="tmpSentContOpin" value="#{loginBean.tempSentimentContextOpinion}" />
+					<h:inputHidden id="tmpSemTerms" value="#{loginBean.tempSemanticTerms}" />
+					<h:inputHidden id="tmpSemTermsPos" value="#{loginBean.tempSemanticTermsPos}" />
+					<h:inputHidden id="tmpSpaTermsPos" value="#{loginBean.tempSpatialTermsPos}" />
+					<h:inputHidden id="tmpSpaTerms" value="#{loginBean.tempSpatialTerms}" />
+					<h:inputHidden id="tmpSentTerms" value="#{loginBean.tempSentimentTerms}" />
+					<h:inputHidden id="tmpSentTermsPos" value="#{loginBean.tempSentimentTermsPos}" />
+					<h:inputHidden id="tmpAnnotSeq" value="#{loginBean.tempAnnotationSequence}" />
+		
+					<p:remoteCommand name="saveAnnotation" actionListener="#{loginBean.saveAnnotation}" update=":form_login" />
+					
+					<p:commandButton styleClass="btn btn-lg btn-primary" style="float:right;" onclick="if (saveAndLoadNextTweet()) saveAnnotation()"
+						value="Save and load next tweet &#187;" />
+					
+					<!-- 
+					<button type="button" class="btn btn-lg btn-primary" style="float:right;" onclick="saveAndLoadNextTweet();">Save and load next tweet &#187;</button>
+			 		-->
+			 
+				</div>
+				<div class="col-sm-3">
+					<div class="sidebar-module sidebar-module-inset">
+						<br />
+			        	<h4><b>Short Guide</b></h4>
+			        	<hr />
+			        	<div align="center">
+			            	<h6><b><em><u>Please note</u>: It is not common but you may find a tweet with more than one thematic or spatial context. For such, please choose the context you guess is the most relevant for the tweet.</em></b></h6>
+			            </div>
+			            <hr />
+			        	<h5><b>&#187; <font color="green">Thematic Annotation</font></b></h5>
+			        	<h6>Currently our focus is on Complaints, most specifically complaints regarding <em>Urban Issues</em>.</h6>
+			        	<h6>The idea is to annotate tweets which describe people complaining or notifying a fixed issue about something (thematic) happening somewhere (spatial).</h6>
+			        	<h6>In order to make the job simple, a taxonomy list will appear when you select one thematic term at least. Please select the appropriate classification.</h6>
+			        	<h6>If you find that the appropriate thematic context is not listed, please select the "Other Urban Issue" option.</h6>
+			        	<h5><b>&#187; <font color="red">Spatial Annotation</font></b></h5>
+			        	<h6>The idea here is to highlight terms which may refer to geographical locations, such as street names, names of pubs, touristic places or even urban areas such as Rathmines, City Centre, D6 and Dublin 1.</h6>
+			            <h6>When you select at least one spatial term, you must select the appropriate spatial context by means of location type.</h6>
+			            <h6>If you find that the appropriate location context is not listed, please select the "Other" option.</h6>
+			            <br />
+			            <div align="center">
+			            	<h5>You can find some more helpful information in <em>Help</em> page.</h5>
+			            </div>
+			        </div>
+				</div>
+			</div>
+				
+			<!-- Manual-developed JavaScript functions
+		    ================================================== -->
+			<script language="JavaScript">
+			//<![CDATA[
+			
+					function annotateTerm(buttonId, type) {
+						
+						var term = document.getElementById(buttonId);
+						var termText = document.getElementById(buttonId+'tex');
+						var pos = buttonId.substr(4);
+						
+						var oldClassName = term.className;
+						
+						if (oldClassName == "btn btn-success btn-xs dropdown-toggle") 
+							remSemanticTerm(termText.innerHTML.trim(),pos);
+						
+						if (oldClassName == "btn btn-danger btn-xs dropdown-toggle")
+							remSpatialTerm(termText.innerHTML.trim(),pos);
+						
+						if (oldClassName == "btn btn-warning btn-xs dropdown-toggle")
+							remSentimentTerm(termText.innerHTML.trim(),pos);
+						
+						switch(type) {
+							case 1:
+								term.className = "btn btn-success btn-xs dropdown-toggle";
+								addSemanticTerm(termText.innerHTML.trim(),pos);
+								break;
+							case 2:
+								term.className = "btn btn-danger btn-xs dropdown-toggle";
+								addSpatialTerm(termText.innerHTML.trim(),pos);
+								break;
+							case 3:
+								term.className = "btn btn-warning btn-xs dropdown-toggle";
+								addSentimentTerm(termText.innerHTML.trim(),pos);
+								break;
+							case 0:
+							default:
+								term.className = "btn btn-default btn-xs dropdown-toggle";
+								hideAnnotateList(buttonId);
+								break;
+						}
+						
+					}
+					
+					function addSemanticTerm(term,pos) {
+						
+						SELECTED_SEMANTIC_TERMS.push(term);
+						SELECTED_SEMANTIC_TERM_POS.push(pos);
+						ANNOTATION_SEQUENCE_POS.push(pos);
+						
+						if (SEMANTIC_TERMS_COUNT == 0) {
+							var sem0 = document.getElementById('semantic0');
+							var sem8 = document.getElementById('semantic8');
+							sem0.style.display = "none";
+							sem8.style.display = "block";
+						}
+						
+						SEMANTIC_TERMS_COUNT++;
+					}
+					
+					function remSemanticTerm(term,pos) {
+						
+						var arrayIndex = SELECTED_SEMANTIC_TERM_POS.indexOf(pos);
+		
+						SELECTED_SEMANTIC_TERM_POS.splice(arrayIndex,1);
+						SELECTED_SEMANTIC_TERMS.splice(arrayIndex,1);
+						
+						SEMANTIC_TERMS_COUNT--;
+						
+						if (SEMANTIC_TERMS_COUNT == 0) {
+							var sem0 = document.getElementById('semantic0');
+							var sem8 = document.getElementById('semantic8');
+							sem8.style.display = "none";
+							sem0.style.display = "block";
+						}
+						
+						var seqIndex = ANNOTATION_SEQUENCE_POS.indexOf(pos);
+						ANNOTATION_SEQUENCE_POS.splice(seqIndex,1);
+					}
+					
+					function addSpatialTerm(term,pos) {
+						
+						SELECTED_SPATIAL_TERMS.push(term);
+						SELECTED_SPATIAL_TERM_POS.push(pos);
+						ANNOTATION_SEQUENCE_POS.push(pos);
+						
+						if (SPATIAL_TERMS_COUNT == 0) {
+							var spa0 = document.getElementById('spatial0');
+							var spa8 = document.getElementById('spatial8');
+							spa0.style.display = "none";
+							spa8.style.display = "block";
+						}
+						
+						SPATIAL_TERMS_COUNT++;
+					}
+					
+					function remSpatialTerm(term,pos) {
+						
+						var arrayIndex = SELECTED_SPATIAL_TERM_POS.indexOf(pos);
+		
+						SELECTED_SPATIAL_TERM_POS.splice(arrayIndex,1);
+						SELECTED_SPATIAL_TERMS.splice(arrayIndex,1);
+						
+						SPATIAL_TERMS_COUNT--;
+						
+						if (SPATIAL_TERMS_COUNT == 0) {
+							var spa0 = document.getElementById('spatial0');
+							var spa8 = document.getElementById('spatial8');
+							spa8.style.display = "none";
+							spa0.style.display = "block";
+						}
+						
+						var seqIndex = ANNOTATION_SEQUENCE_POS.indexOf(pos);
+						ANNOTATION_SEQUENCE_POS.splice(seqIndex,1);
+					}
+					
+					function addSentimentTerm(term,pos) {
+						
+						SELECTED_SENTIMENT_TERMS.push(term);
+						SELECTED_SENTIMENT_TERM_POS.push(pos);
+						ANNOTATION_SEQUENCE_POS.push(pos);
+						
+						/*
+						if (SENTIMENT_TERMS_COUNT == 0) {
+							var sen0 = document.getElementById('sentiment0');
+							var sen8 = document.getElementById('sentiment8');
+							sen0.style.display = "none";
+							sen8.style.display = "block";
+						}
+						*/
+						
+						SENTIMENT_TERMS_COUNT++;
+					}
+					
+					function remSentimentTerm(term,pos) {
+						
+						var arrayIndex = SELECTED_SENTIMENT_TERM_POS.indexOf(pos);
+		
+						SELECTED_SENTIMENT_TERM_POS.splice(arrayIndex,1);
+						SELECTED_SENTIMENT_TERMS.splice(arrayIndex,1);
+						
+						SENTIMENT_TERMS_COUNT--;
+						
+						/*
+						if (SENTIMENT_TERMS_COUNT == 0) {
+							var sen0 = document.getElementById('sentiment0');
+							var sen8 = document.getElementById('sentiment8');
+							sen8.style.display = "none";
+							sen0.style.display = "block";
+						}
+						*/
+						
+						var seqIndex = ANNOTATION_SEQUENCE_POS.indexOf(pos);
+						ANNOTATION_SEQUENCE_POS.splice(seqIndex,1);
+					}
+					
+					function selectSemanticContext(value,textVal) {
+						SELECTED_SEMANTIC_CONTEXT = value;
+						var selectList = document.getElementById('semanticContextList');
+						selectList.innerHTML = textVal + ' <span class=\"caret\"></span>';
+					}
+					
+					function selectSentimentContext(value,textVal) {
+						SELECTED_SENTIMENT_CONTEXT = value;
+						//var selectList = document.getElementById('sentimentContextList');
+						//selectList.innerHTML = textVal + ' <span class=\"caret\"></span>';
+					}
+					
+					function selectSentimentOpinionContext(value) {
+						SELECTED_SENTIMENT_OPINION_CONTEXT = value;
+					}
+					
+					function selectSpatialContext(value,textVal) {
+						SELECTED_SPATIAL_CONTEXT = value;
+						var selectList = document.getElementById('spatialContextList');
+						selectList.innerHTML = textVal + ' <span class=\"caret\"></span>';
+					}
+
+					function selectSentiment(radioButton) {
+												
+						switch(radioButton.value) {
+						
+							case "1":
+								activateSentiment("positive-button");
+								deActivateSentiment("neutral-button");
+								deActivateSentiment("negative-button");
+								
+								selectSentimentContext(radioButton.value,"Positive");
+								break;
+							case "2":
+								deActivateSentiment("positive-button");
+								activateSentiment("neutral-button");
+								deActivateSentiment("negative-button");
+								
+								selectSentimentContext(radioButton.value,"Neutral");
+								break;
+							case "3":
+								deActivateSentiment("positive-button");
+								deActivateSentiment("neutral-button");
+								activateSentiment("negative-button");
+								
+								selectSentimentContext(radioButton.value,"Negative");
+								break;
+						}
+					}
+					
+					function activateSentiment(sentimentButton) {
+						
+						var radio1 = document.getElementById(sentimentButton+'-selected');
+						var radio2 = document.getElementById(sentimentButton+'-unselected');
+						
+						radio1.style.display = "inline";
+						radio2.style.display = "none";
+					}
+					
+					function deActivateSentiment(sentimentButton) {
+						
+						var radio1 = document.getElementById(sentimentButton+'-selected');
+						var radio2 = document.getElementById(sentimentButton+'-unselected');
+						
+						radio1.style.display = "none";
+						radio2.style.display = "inline";
+					}
+					
+					function showAnnotateList(termId) {
+						
+						var textTerm = document.getElementById(termId+'tex');
+						var buttonTerm = document.getElementById(termId+'div');
+						
+						textTerm.style.display = "none";
+						buttonTerm.style.display = "inline";
+					}
+					
+					function hideAnnotateList(termId) {
+						
+						var textTerm = document.getElementById(termId+'tex');
+						var buttonTerm = document.getElementById(termId+'div');
+						
+						buttonTerm.style.display = "none";
+						textTerm.style.display = "inline";
+					}
+					
+					function saveAndLoadNextTweet() {
+						
+						document.getElementById('form_login:tmpSemCont').value = SELECTED_SEMANTIC_CONTEXT;
+						document.getElementById('form_login:tmpSpaCont').value = SELECTED_SPATIAL_CONTEXT;
+						document.getElementById('form_login:tmpSentCont').value = SELECTED_SENTIMENT_CONTEXT;
+						document.getElementById('form_login:tmpSentContOpin').value = SELECTED_SENTIMENT_OPINION_CONTEXT;
+						
+						document.getElementById('form_login:tmpSemTerms').value 	= SELECTED_SEMANTIC_TERMS;
+						document.getElementById('form_login:tmpSemTermsPos').value 	= SELECTED_SEMANTIC_TERM_POS;
+						document.getElementById('form_login:tmpSpaTerms').value		= SELECTED_SPATIAL_TERMS;
+						document.getElementById('form_login:tmpSpaTermsPos').value 	= SELECTED_SPATIAL_TERM_POS;
+						document.getElementById('form_login:tmpSentTerms').value	= SELECTED_SENTIMENT_TERMS;
+						document.getElementById('form_login:tmpSentTermsPos').value = SELECTED_SENTIMENT_TERM_POS;
+						
+						document.getElementById('form_login:tmpAnnotSeq').value 	= ANNOTATION_SEQUENCE_POS;
+
+						if (SEMANTIC_TERMS_COUNT > 0 && SELECTED_SEMANTIC_CONTEXT == null) {
+							alert("Sorry. You must select a thematic context for the terms you've selected.");
+							return false;
+						}
+						
+						if (SPATIAL_TERMS_COUNT > 0 && SELECTED_SPATIAL_CONTEXT == null) {
+							alert("Sorry. You must select a spatial context for the terms you've selected.");
+							return false;
+						}
+						
+						if (SELECTED_SENTIMENT_CONTEXT == null) {
+							alert("Sorry. You must select a sentiment for the terms you've selected.");
+							return false;
+						}
+						
+						if (SELECTED_SENTIMENT_OPINION_CONTEXT == null) {
+							alert("Sorry. You must select the nature of the message for the sentiment terms you've selected.");
+							return false;
+						}
+						
+						// reset JavaScript vars
+						SEMANTIC_TERMS_COUNT = 0;
+				    	SELECTED_SEMANTIC_CONTEXT = null;
+				    	SELECTED_SEMANTIC_TERM_POS = Array();
+				    	SELECTED_SEMANTIC_TERMS = Array();
+				    	
+				    	SPATIAL_TERMS_COUNT = 0;
+				    	SELECTED_SPATIAL_CONTEXT = null;
+				    	SELECTED_SPATIAL_TERM_POS = Array();
+				    	SELECTED_SPATIAL_TERMS = Array();
+				    	
+				    	SENTIMENT_TERMS_COUNT = 0;
+				    	SELECTED_SENTIMENT_CONTEXT = null;
+				    	SELECTED_SENTIMENT_OPINION_CONTEXT = null;
+				    	SELECTED_SENTIMENT_TERM_POS = Array();
+				    	SELECTED_SENTIMENT_TERMS = Array();
+				    	
+				    	ANNOTATION_SEQUENCE_POS = Array();
+				    	
+				    	
+				    	$(document).ready( function() {
+					    	$('#ann_alert').show(400);
+					    	$('#ann_alert').delay(3000).fadeOut();
+					    	setTimeout('',4000);
+					    });
+						
+				    	return true;
+					}
+			//]]>
+			</script>	
+			
+		</p:outputPanel>
+		
+		</div>
+	</p:outputPanel>
+	
+	<p:outputPanel rendered="#{loginBean.currentUser!=null and loginBean.currentPage=='Manage'}">
+		<div class="container">
+	
+	      <div class="starter-template">
+	        <h1>Management</h1>
+	      </div>
+			
+			<div class="panel panel-warning">
+				<div class="panel-body" align="center">
+					
+					<p:dataTable var="atweet" value="#{loginBean.tweetsAnnotated}">
+					
+						<f:facet name="header">
+				            Annotated Tweets
+				        </f:facet>
+				        <p:column headerText="User" width="10%">
+				            <h:outputText value="#{atweet.user.name}" />
+				        </p:column>
+				        <p:column headerText="TweetId" width="18%">
+				            <h:outputText value="#{atweet.tweet.statusId}" title="#{atweet.tweet.message}" />
+				        </p:column>
+				        <p:column headerText="Semantic Context">
+				            <h:outputText value="#{atweet.semContext.name}" />
+				        </p:column>
+				        <p:column headerText="Spatial Context">
+				            <h:outputText value="#{atweet.spatialContext.name}" />
+				        </p:column>
+				        <p:column headerText="Datetime" width="20%">
+				            <h:outputText value="#{atweet.dateTime}" />
+				        </p:column>
+				        
+					</p:dataTable>
+					
+				    
+				</div>
+			</div>
+			
+		</div>
+	</p:outputPanel>
+	
+	<p:outputPanel rendered="#{loginBean.currentUser!=null and loginBean.currentPage=='About'}">
+		<div class="container">
+	
+	      <div class="starter-template">
+	        <h1>About</h1>
+	      </div>
+	
+			<div class="panel panel-warning">
+				<div class="panel-body" align="center">
+					<video height="450" controls="true">
+					  <source src="#{resource['video/HowIsTheJob.mp4']}" type="video/mp4" />
+					</video>
+				</div>
+			</div>
+			
+		</div>
+	</p:outputPanel>
+	
+	<p:outputPanel rendered="#{loginBean.currentUser!=null and loginBean.currentPage=='Contact'}">
+		<div class="container">
+	
+	      <div class="starter-template">
+	        <h1>Contact Info</h1>
+	      </div>
+	
+			<div class="panel panel-warning">
+				<div class="panel-body">
+					<p>Maxwell Guimarães de Oliveira, PhD candidate at UFCG (<i>University of Campina Grande</i>), Brazil, and visiting researcher at UCD (<i>University College Dublin</i>), Ireland, is the head of this project.</p>
+		            <p>He is pleased to appreciate your contact trough the email: <a href="mailto:maxwell@ufcg.edu.br">maxwell@ufcg.edu.br</a></p>
+		            <p>If you find any bug or have some suggestions, please email him.</p>
+		            <hr />
+		            <p>The following researchers are involved in this project:</p>
+		            <ul>
+					  <li>Cláudio de Souza Baptista, PhD, <i>Federal University of Campina Grande (UFCG)</i></li>
+					  <li>Cláudio E. C. Campelo, PhD, <i>Federal University of Campina Grande (UFCG)</i></li>
+					  <li>Michela Bertolotto, PhD, <i>University College Dublin (UCD)</i></li>
+					  <li>Luiz Henrique de Andrade, Undergraduate, <i>Federal University of Campina Grande (UFCG)</i></li>
+					</ul>
+					<hr />
+					<p>Partner Institutions:</p>
+					<div class="media">       
+		          		<div class="row">
+						  <div class="col-md-2" align="center">
+						      <img class="media-object" src="#{resource['imgs/ufcg.png']}" width="120px" />
+						  </div>
+						  <div class="col-md-2" align="center">
+						      <img class="media-object" src="#{resource['imgs/ucd.png']}" width="90px" />
+						  </div>
+						  <div class="col-md-2" align="center">
+						      <img class="media-object" src="#{resource['imgs/cnpq.png']}" width="160px" />
+						  </div>
+					  	</div>
+					</div>
+				</div>
+			</div>
+			
+		</div>
+	</p:outputPanel>
+	
+	<p:outputPanel rendered="#{loginBean.currentUser==null}">
+    <!-- Main jumbotron for a primary marketing message or call to action -->
+    <div class="jumbotron">
+      <div class="container" style="color:#FFAD00; text-shadow: 2px 2px #131219; background-image: url('#{resource['imgs/hands.jpg']}'); opacity: 0.9;">
+      	<br />
+      	<br />
+      	<br />
+      	<br />
+      	<br />
+        <h1><b>Join to help the community!</b></h1>
+        <p><i>Tweet Annotator is an application which allows well-meaning volunteers to perform thematic and geographical annotations on tweets. These annotations would enable the production of a new generation of automated tools which will help the community on making social media voices more strong.</i></p>
+        <p><a class="btn btn-primary btn-lg" href="#more" role="button">Learn more &#187;</a></p>
+        <br />
+        <br />
+        <div id="more"></div>
+      </div>
+    </div>
+
+    <div class="container">
+      <!-- Example row of columns -->
+      <div class="row">
+        <div class="col-md-4">
+          <h2>The Project</h2>
+          <p>The Tweet Annotator is a web system developed aiming at producing gold-standard datasets of semantically-enriched tweets. This aplication is part of a PhD research which investigates strategies on information retrieval from social media data and social media mining. Produced gold-standard datasets can aid on the development of novel solutions for automated information extraction.</p>
+          <p>The main idea of this project is to make the social media voices stronger by means of providing a fast data extraction from many web streams. The main idea of this project is to make the social media voices stronger by providing automated relevant data extraction from many web streams. Such extracted data can be widely useful in domain-specialized environments such as Smart Cities, Hazard Management, Business Intelligence, and others.</p>
+          <p>Our current focus is on the smart cities domain. Thus, volunteers will work with urban issues reported from social media users located in the Greater London area (United Kingdom).</p>
+          <!-- <p><a class="btn btn-default" href="#" role="button">View details &#187;</a></p>  -->
+          <div class="media">       
+          	<div class="row">
+			  <div align="center">
+			      <img class="media-object" src="#{resource['imgs/london.png']}" width="360" />
+			  </div>
+			</div>
+			</div>
+        </div>
+        <div class="col-md-4">
+          <h2>The Task</h2>
+          <p>It is a very simple job: the volunteer will see anonimous tweet messages which was delivered by users located around London, in the UK. For each tweet, the volunteer will <u>select and classify key terms</u> according to a pre-defined taxonomy list (<i>thematic annotation</i>); or related to place names (<i>geographic annotation</i>), such as street names, names of pubs, touristic places or even urban areas such as Westminster, City Centre and Stratford; or expressions which highlights the user mood (<i>sentiment annotation</i>), such as happy, bad, worse and emoticons, and aid to classify the tweet in opinative or informative.</p>
+          <p>To perform the job for while, it is only desired the volunteers speak advanced or native English, and also have a reasonable knowledge about the urban area and its neighbourhood. It is not mandatory to be an specialist on every city area. Residents for over than three months are welcome.</p>
+          <p>During the job, you may find a tweet with both thematic and geographic key terms, as you may also find tweets with only thematic or geographic key terms, or even with no key terms to annotate. We trust in your skills to identify them correctly! ;)</p>
+          <p>Are you interested to join us? Please, just email <a href="mailto:luizha.cc@gmail.com">Luiz Andrade</a> or <a href="mailto:maxwell@ufcg.edu.br">Maxwell Oliveira</a> in order to sign up.</p>
+          <!-- <p><a class="btn btn-default" href="#" role="button">View details &#187;</a></p> -->
+       </div>
+        <div class="col-md-4">
+          <h2>Contact</h2>
+          <p>Maxwell Guimarães de Oliveira, PhD candidate at UFCG (<i>University of Campina Grande</i>), Brazil, and visiting researcher at UCD (<i>University College Dublin</i>), Ireland, is the head of this project.</p>
+          <p>He is pleased to appreciate your contact trough the email: <a href="mailto:maxwell@ufcg.edu.br">maxwell@ufcg.edu.br</a></p>
+          <p>If you would like to be a volunteer in this exciting project, just subscribe sending an e-mail. You will receive your access credentials in a few hours after.</p>
+          <!-- <p><a class="btn btn-default" href="#" role="button">View details &#187;</a></p>  -->
+          <br />
+          <div class="media">       
+          		<div class="row">
+				  <div class="col-md-6" align="right">
+				      <img class="media-object" src="#{resource['imgs/ufcg.png']}" width="120px" />
+				  </div>
+				  <div class="col-md-6" align="left">
+				      <img class="media-object" src="#{resource['imgs/ucd.png']}" width="90px" />
+				  </div>
+			  	</div>
+			  	<div class="row">
+			  		<br/>
+			  	</div>
+			  	<div class="row">
+			  		<div align="center">
+			      		<img class="media-object" src="#{resource['imgs/cnpq.png']}" width="160px" />
+			  		</div>
+			  	</div>
+			  	<div class="row">
+			  		<br/>
+			  	</div>
+			  	<div class="row">
+			  		<div align="center">
+			      		<img class="media-object" src="#{resource['imgs/lsi.png']}" width="200px" />
+			  		</div>
+			  	</div>
+			</div>
+        </div>
+      </div>
+
+      <hr />
+
+      <footer>
+        <p> &#169; Copyright 2015-2016 - All Rights Reserved - Directly involved researchers: Maxwell G. de Oliveira, Claudio de S. Baptista, Claudio E. C. Campelo, Luiz H. de Andrade (<i>University of Campina Grande</i>) and Michela Bertolotto (<i>University College Dublin</i>)</p>
+      </footer>
+    </div> <!-- /container -->
+    
+	</p:outputPanel>
+	
+	</h:form>
+	
+	    <!-- Bootstrap core JavaScript
+	    ================================================== -->
+	    <!-- Placed at the end of the document so the pages load faster -->
+	    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
+	    <h:outputScript name="bootstrap-3.3.4-dist/js/bootstrap.min.js" />
+	    <!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
+	    <h:outputScript name="bootstrap-3.3.4-dist/js/ie10-viewport-bug-workaround.js" />
+    
+    </p:layout>
+    
+  </h:body>
+</html>
